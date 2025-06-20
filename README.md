@@ -1,5 +1,5 @@
 # Horizontal transfer TE fungi
-Scripts used to detect horizontal transfer of transposable elements (HTT) in 1,348 publicly available fungal genomes (JGI), see [reference]. Folders include Snakemake pipelines, scripts, and a file containing software versions used for each specific pipeline. 
+Scripts used to detect horizontal transfer of transposable elements (HTT) in 1,348 publicly available fungal genomes (JGI), see [reference]. Folders include Snakemake pipelines, scripts, and a file containing software versions used for each specific pipeline. All scripts included in these pipelines are created by Josje Romeijn (MGE lab, Utrecht University). 
 
 1. Extraction of TEs from fungal genomes 
 2. TE classification 
@@ -15,7 +15,7 @@ Scripts used to detect horizontal transfer of transposable elements (HTT) in 1,3
 - Python package tqdm v4.67.1
 
 ### 1. Extraction of TEs from fungal genomes
-Make sure to only store .fasta files of fungal genomes included in this analysis in genome_folder, as the pipeline scans this directory for .fasta files for input. 
+Make sure to only store .fasta files of fungal genomes included in this analysis in `genome_folder`, as the pipeline scans this directory for .fasta files for input. 
 - BEDtools v2.31.1
 - Transeq v6.6.0.0
 - HMMER v3.4
