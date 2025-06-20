@@ -22,11 +22,13 @@ Make sure to only store .fasta files of fungal genomes included in this analysis
 - RPSTBLASTN v2.12.0+
 
 ### 2. BUSCO Ks estimations of genome comparisons
-This pipeline starts by creating a file that identifies the best BUSCO gene comparisons for each comparison of 2 nodes in a phylogenetic tree. How it works is explained in the tree below. 
+This pipeline starts by creating a file that identifies the best BUSCO gene comparisons for each comparison of 2 nodes in a phylogenetic tree (`list_busco_seqs_species.txt`). How it works is explained in the tree below. 
 
-First, for node 20 is determined which fungal BUSCO set is most suitable (priority: class-level, order-level, phylum-level, kingdom-level BUSCO set). Next, for each BUSCO gene in the determined BUSCO set the two longest copies of this BUSCO gene are searched in the two children clades. In this case, genome A and D both have the longest copy, and are added for this BUSCO gene to the list. 
+First, for node 20 is determined which fungal BUSCO set is most suitable (priority: class-level, order-level, phylum-level, kingdom-level BUSCO set). Next, for each BUSCO gene in the determined BUSCO set the two longest copies of this BUSCO gene are searched in the two children clades. In this case, genome A and D both have the longest copy, and are added for this BUSCO gene to the list. In case of equal lengths, a random genome is chosen from each child clade.
 
 Format of `list_busco_seqs_species.txt`:
 {node_name}__{species1}__{species2}__{busco_set}__{busco_gene}
 e.g.:
 node1__Zymtr1__Phaal1__fungi__100957at4751
+
+The amount of jobs in this pipeline are too much to handle for Snakemake. Therefore, we've found a work-around by 
