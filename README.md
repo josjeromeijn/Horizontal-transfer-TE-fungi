@@ -34,9 +34,9 @@ node1__Zymtr1__Phaal1__fungi__100957at4751
 The amount of jobs in this pipeline are too much to handle for Snakemake (>4 million BUSCO gene comparisons x 3 jobs). Therefore, we've found a work-around by giving a subset of BUSCO comparisons to Snakemake using a for-loop in bash (`run_snakemake_in_batches.sh`). 
 - python package ete3 v.3.1.3
 - mafft v7.505
-- PAL2NAL (v14)
-- R package seqinr (v.4.2-36)
-- python package numpy (v1.26.3)
-- python package biopython (1.78)
+- PAL2NAL v14
+- R package seqinr v.4.2-36
+- python package numpy v1.26.3
+- python package biopython 1.78
 
 ### 4. TE vs TE blast
