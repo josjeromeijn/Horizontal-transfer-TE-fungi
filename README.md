@@ -31,4 +31,4 @@ Format of `list_busco_seqs_species.txt`:
 e.g.:
 node1__Zymtr1__Phaal1__fungi__100957at4751
 
-The amount of jobs in this pipeline are too much to handle for Snakemake. Therefore, we've found a work-around by 
+The amount of jobs in this pipeline are too much to handle for Snakemake (>4 million BUSCO gene comparisons x 3 jobs). Therefore, we've found a work-around by 
