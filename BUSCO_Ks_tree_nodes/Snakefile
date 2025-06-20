@@ -3,7 +3,7 @@
 
 #Load config file and packages
 configfile: "config.yaml"
-import os, subprocess, glob
+import os
 from snakemake.utils import makedirs
 
 OUT_DIR=config["out_dir"]
