@@ -1,0 +1,106 @@
+###30-01-24 by Josje Romeijn
+#Snakefile to extract TEs from genomes using the coordinates in BED files
+
+#Load config file and packages
+configfile: "config.yaml"
+import os
+from snakemake.utils import makedirs
+
+OUT_DIR=config["out_dir"]
+CLUSTER_FILE=config["cluster_file"]
+CDD_DB=config["cdd_db"]
+PFAM_DB=config["pfam_db"]
+
+#define a list containing all genome names
+genome_folder = config["genome_folder"]
+GENOMES = []
+for file in os.listdir(genome_folder):
+    if file.endswith(".fasta"):
+        genome_name = file.split(".")[0]
+        GENOMES.append(genome_name)
+
+
+
+#Rule defining output files
+rule all:
+    input:
+        expand(OUT_DIR + "protein_domains/rpstblastn/{genome}", genome=GENOMES),
+        expand(OUT_DIR + "OUT_DIR + "protein_domains/hmmscan/{genome}_hmm.txt", genome=GENOMES)
+        
+
+
+
+#1)EXTRACT TRANSPOSONS
+
+#per genome, make a temporary file containing unique ID's per transposon sequence
+rule make_region_files:
+    input:
+        gff=config["gff_folder"] + "{genome}.filteredRepeats.gff"
+    output:
+        OUT_DIR + "names_{genome}.txt"
+    shell:
+        """
+        awk -F'\t' '!/^#/ {{split($9, a, ";"); for (i in a) {{if (match(a[i], "ID=")) {{gsub("ID=", "", a[i]); print a[i]}}}}}}' {input.gff} | awk '{{count[$1]++; print $1"_"count[$1]-1}}' > {output}
+        """
+
+#per genome, first merge this temporary transposon ID's file with the GFF file containing the locations of the transposons. Then, extract the transposons using this GFF file
+#(all transposon fasta seqs will have unique ID). Furthermore, since .BED interprets DNA coordinates 0 based and half-open (bed-format), we extract 1 from all start coordinates.
+rule extract_sequences:
+    input:
+        fasta=config["genome_folder"] + "{genome}.fasta",
+        gff=config["gff_folder"] + "{genome}.filteredRepeats.gff",
+        region_file=OUT_DIR + "names_{genome}.txt"
+    output:
+        OUT_DIR + "{genome}_extracted_TE.fasta"
+    shell:
+        """
+        paste <(awk '{{print $1 "\t" $4 "\t" $5}}' {input.gff}) <(awk '{{print $1}}' {input.region_file}) \
+        | awk '$4 !~ /^\(.*\)N_[0-9]+$/{{ $2 = $2 - 1; print }}' \
+        | tr ' ' '\t' \
+        | bedtools getfasta -name+ -fi {input.fasta} -bed - > {output}
+        """
+
+#2)FIND TE-RELATED PROTEIN DOMAINS
+
+#in order to run HMMSCAN on PFAM HMM profiles, first convert transposon DNA seqs to protein seqs (to all 6 possible reading frames)
+rule translate_nuc_to_prot:
+    input:
+        rules.extract_sequences.output
+    output:
+        OUT_DIR + "translated/{genome}_translated.fasta"
+    shell:
+        """
+        transeq {input} -frame=6 -sformat pearson -outseq {output}
+        """
+
+
+#run HMMscan on translated TE seqs and compare to 110 PFAM HMM profiles
+rule hmmscan:
+    input:
+        genome=rules.translate_nuc_to_prot.output
+    output:
+        OUT_DIR + "protein_domains/hmmscan/{genome}_hmm.txt"
+    params: 
+        db = PFAM_DB
+        
+    shell:
+        """
+        hmmscan --domtblout {output} -E 0.001 {params} {input}
+        """
+
+
+
+#run RPS-TBLASTN on 142 CDD's
+rule rps_tblastn:
+    input:
+        genome=rules.extract_sequences.output
+    output:
+        OUT_DIR + "protein_domains/rpstblastn/{genome}"
+    params:
+        db = CDD_DB
+    shell:
+        """
+        rpstblastn -query {input.genome} -db {params} -out {output} -outfmt 6 -evalue 0.001 -max_target_seqs 1
+        """
+
+
