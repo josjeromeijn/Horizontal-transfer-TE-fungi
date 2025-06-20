@@ -1,0 +1,98 @@
+#25-04-24 by Josje Romeijn
+#Snakefile to run TE_vs_TE blast comparisons
+
+#Load config file and packages
+configfile: "config.yaml"
+import os, subprocess, glob
+from snakemake.utils import makedirs
+
+OUT_DIR=config["out_dir"]
+BUSCO_FOLDER=config["busco_folder"]
+TREE=config["tree"]
+
+#get the list of busco seqs for each node
+#if the file doesn't exixt, generate it using python script
+if not os.path.isfile("list_busco_seqs_species.txt"):
+    print("generating list of busco comparisons")
+    os.system("python get_node_list.py -i " + TREE + "-b " + BUSCO_FOLDER)
+
+print("load in list with busco seqs and species")
+with open("list_busco_seqs_species.txt", "r") as file:
+    node_list = [line.strip() for line in file]
+
+print("done loading")
+
+node_name=list(set([node.split("__")[0] for node in node_list]))
+node_name.sort(key=int)
+
+
+def split(a, n):
+    k, m = divmod(len(a), n)
+    return (a[i*k+min(i, m):(i+1)*k+min(i+1, m)] for i in range(n))
+
+list = list(split(node_name, int(config.get("out_of"))))
+node_name = list[int(config.get("part"))]
+
+nodes_this_run = [node for node in node_list if any(node.startswith(i + "__") for i in node_name)]
+
+print(f"Nodes for this run: {len(node_name)} out of 1348. BUSCO seqs are {len(nodes_this_run)} out of {len(node_list)}")
+
+
+#Rule for creating output file
+rule all:
+    input:
+        expand(OUT_DIR + "Ks/Ks_temp/{comb}__Ks.txt", comb = nodes_this_run),
+        expand(OUT_DIR + "Ks/{node_name}_KaKs.txt", node_name = node_name)
+
+
+
+
+
+rule align:
+    input:
+        faa_comp1 = BUSCO_FOLDER + "{species1}_{busco_level}/run_{busco_level}_odb10/busco_sequences/single_copy_busco_sequences/{busco}.faa",
+        faa_comp2 = BUSCO_FOLDER + "{species2}_{busco_level}/run_{busco_level}_odb10/busco_sequences/single_copy_busco_sequences/{busco}.faa",
+        fna_comp1 = BUSCO_FOLDER + "{species1}_{busco_level}/run_{busco_level}_odb10/busco_sequences/single_copy_busco_sequences/{busco}.fna",
+        fna_comp2 = BUSCO_FOLDER + "{species2}_{busco_level}/run_{busco_level}_odb10/busco_sequences/single_copy_busco_sequences/{busco}.fna"
+    output:
+        fna = temp(OUT_DIR + "mafft/{node_nr}__{species1}__{species2}__{busco_level}__{busco}__fna.aln"),
+        faa = temp(OUT_DIR + "mafft/{node_nr}__{species1}__{species2}__{busco_level}__{busco}__faa.aln")
+    shell:
+        """
+        cat {input.faa_comp1} {input.faa_comp2} | mafft --thread 1 --auto --quiet - > {output.faa}
+        cat {input.fna_comp1} {input.fna_comp2} | mafft --thread 1 --auto --quiet  - > {output.fna}
+        """
+
+
+rule pal2nal_codon_alignment:
+    input:
+        fna_alignment = rules.align.output.fna,
+        faa_alignment = rules.align.output.faa
+    output:
+        temp(OUT_DIR + "pal2nal/{node_nr}__{species1}__{species2}__{busco_level}__{busco}__codon.aln")
+    shell:
+        """
+        pal2nal.pl {input.faa_alignment} {input.fna_alignment} -output fasta -nostderr -nogap > {output}
+        """
+
+rule ks_calc:
+    input:
+        rules.pal2nal_codon_alignment.output
+    output:
+        OUT_DIR + "Ks/Ks_temp/{node_nr}__{species1}__{species2}__{busco_level}__{busco}__Ks.txt"
+    shell:
+        """
+        Rscript KaKs.R {input} {output} {wildcards.species1} {wildcards.species2} {wildcards.busco}
+        """
+
+
+rule concatenate_ks:
+     input:
+        ks = lambda wildcards: expand(OUT_DIR + "Ks/Ks_temp/{combined_name}__Ks.txt",
+            combined_name = [node for node in nodes_this_run if node.startswith(wildcards.node_name + "__")])
+     output:
+         OUT_DIR + "Ks/{node_name}_KaKs.txt"
+     shell:
+         """
+         paste -s {input} > {output}
+         """
