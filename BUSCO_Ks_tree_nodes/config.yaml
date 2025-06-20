@@ -1,0 +1,5 @@
+out_dir: "/your/path/"
+busco_folder: "/your/path/"
+
+#tree in Newick format, preferably RAD scaled.
+tree: "/your/path/to/tree"
