@@ -7,7 +7,6 @@ import os
 from snakemake.utils import makedirs
 
 OUT_DIR=config["out_dir"]
-CLUSTER_FILE=config["cluster_file"]
 CDD_DB=config["cdd_db"]
 PFAM_DB=config["pfam_db"]
 
