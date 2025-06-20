@@ -1,0 +1,272 @@
+####25-04-24 by Josje Romeijn
+#Snakefile to run TE_vs_TE blast comparisons
+
+#Load config file and packages
+configfile: "config.yaml"
+import os
+from snakemake.utils import makedirs
+from collections import Counter
+
+OUT_DIR=config["out_dir"]
+TE_FOLDER=config["TE_folder"]
+PROTEIN_DOMAIN_DIR=config["protein_domain_dir"]
+GENOMES_WITHOUT_TE_WITH_PROT_DOMAIN = config["genomes_without_TE_with_prot_domain"]
+MAXGAP = config["maxgap"]
+MAXOVERLAP = config["maxoverlap"]
+COLLAPSED_NODES = config["collapsed_nodes"]
+
+#1--------------define functions and a list containing all genome names------------
+GENOMES = []
+for file in os.listdir(TE_FOLDER):
+    if file.endswith("_extracted_TE.fasta"):
+        genome_name = file.split("_extracted_TE.fasta")[0]
+        if genome_name not in GENOMES_WITHOUT_TE_WITH_PROT_DOMAIN and genome_name not in ['PpacPPUFV02', 'Phapa1', 'PhapaK8108']:
+            GENOMES.append(genome_name)
+
+#and add a list with collapsed nodes:
+col_nodes = []
+with open(COLLAPSED_NODES, 'r') as f:
+    for line in f:
+        line = line.rstrip() #remove trailing \n
+        col_nodes.append([line.split("\t")[0], line.split("\t")[1]])
+        col_nodes.append([line.split("\t")[1], line.split("\t")[0]])
+
+#function to find identical TE sequences and remove them from TE_with_prot_domain list.
+#takes fasta file, list of headers it needs to match and the species as input,
+#gives a dictionary (with headers as keys, seqs as value) as output and a dictionary of
+#headers that were removed.
+def identify_duplicates_from_fasta(file_path, headers, species):
+    #go over fasta file and extract headers (and associated sequence), and store
+    #in dictionary
+    sequences = {}
+    with open(file_path, 'r') as file:
+        for line in file:
+            line = line.strip()
+            if line.startswith('>'):
+                current_header = line[1:]
+                if current_header in headers:
+                    sequences.setdefault(current_header, '')
+            elif current_header in headers:
+                sequences[current_header] += line
+
+    #find sequences that are completely identical, subsequently find their headers.
+    #Of these duplicate groups, only keep the first header in the list of headers.
+    #Store other headers in keys_to_remove, so they can be removed later on.
+    value_counts = Counter(sequences.values())
+    keys_to_remove = [key for value, count in value_counts.items()
+        if count > 1 for key in list(sequences.keys()) if sequences[key] == value][1:]
+
+    similar_keys_dict = {}
+    for value, count in value_counts.items():
+        if count > 1:
+            similar_keys_dict[value] = [key for key in sequences.keys() if sequences[key] == value]
+
+
+    for key in keys_to_remove:
+        del sequences[key]
+
+    #add back species name to all headers in dict sequences
+    sequences = {f'{species}__{key}': value for key, value in sequences.items()}
+
+    return sequences, similar_keys_dict
+
+
+
+
+#function to identify TEs that have a protein domain
+#takes hmmscan and rpstblastn file as input and returns a list with headers
+#of seqs that contain a protein domain
+def get_headers_of_seq_with_prot_domain(hmm_scan_output,rps_output):
+    TE_with_prot_domain = set()
+    with open(hmm_scan_output, 'r') as f:
+        next(f) #skip first line -> headers
+        for line in f:
+            #add TE to set (if not already in the set)
+            TE_with_prot_domain.add(line.split()[3].rsplit("_", 1)[0])
+
+
+    with open(rps_output, 'r') as f:
+        next(f) #skip first line -> headers
+        for line in f:
+            try:
+                TE_with_prot_domain.add(line.split()[0])
+            except: pass
+
+    return TE_with_prot_domain
+
+
+
+#Rule for creating output file
+rule all:
+    input:
+        expand(OUT_DIR + "blastn_chained/blastn_{genome}_TEs_versus_other_fungal_TEs_chained.txt", genome=GENOMES),
+        OUT_DIR + "number_of_hits_insufficient_alignment_coverage.txt"
+
+
+
+
+
+#1)-----------------PREPARE FILES FOR BLAST SEARCHES----------------------------
+
+remove duplicate sequences and sequences without a protein domain
+rule remove_seqs:
+   input:
+       fasta = TE_FOLDER + "{genome}_extracted_TE.fasta",
+       hmmscan = PROTEIN_DOMAIN_DIR + "{genome}/overlap_removed_hmm.txt",
+       rps = PROTEIN_DOMAIN_DIR + "{genome}/overlap_removed_rps.txt"
+   output:
+       dupl_headers = OUT_DIR + "duplicate_headers/duplicate_seqs_{genome}.txt",
+       fasta = OUT_DIR + "fasta_with_prot_domain_no_dupl/{genome}_with_prot_domain_no_dupl.fasta"
+   run:
+       #get list of headers of seqs which have a protein domain (by hmmscan or rps)
+       headers_prot_domain= get_headers_of_seq_with_prot_domain(input.hmmscan, input.rps)
+
+       #get sequences of these headers and check if there are duplicates
+       #(duplicates = sequences that have same length and sequence)
+       seq_with_pd_no_dup, removed = identify_duplicates_from_fasta(input.fasta, headers_prot_domain, wildcards.genome)
+
+       #create file that stores the headers that were removed (since they were duplicates)
+       with open(str(output.dupl_headers), "w") as file:
+           for sequence, header in removed.items():
+               for h in header:
+                   file.write(h + "\n" + sequence + "\n")
+               file.write("\n")
+
+       #write the output to a new fasta file
+       with open(str(output.fasta), "w") as file:
+           for header, sequence in seq_with_pd_no_dup.items():
+               file.write(">" + header + "\n" + sequence + "\n")
+
+
+#2)----------------------CREATE DATABASES---------------------------------------
+
+#for each species: create a database of TEs of all other species (without itself,
+#to avoid self-comparisons, see input line)
+rule create_databases:
+   input:
+       lambda wildcards: expand(
+           OUT_DIR + "fasta_with_prot_domain_no_dupl/{sp}_with_prot_domain_no_dupl.fasta", sp=GENOMES)
+   params:
+       db_prefix=OUT_DIR + "db/all_genomes"
+   output:
+       db_input_fasta=OUT_DIR + "db/input/all_genome.fasta",
+       db_files=[
+           OUT_DIR + "db/all_genomes.00.nhr",
+           OUT_DIR + "db/all_genomes.00.nin",
+           OUT_DIR + "db/all_genomes.00.nsq",
+           OUT_DIR + "db/all_genomes.01.nhr",
+           OUT_DIR + "db/all_genomes.01.nin",
+           OUT_DIR + "db/all_genomes.01.nsq"]
+   shell:
+       """
+       cat {input} > {output.db_input_fasta}
+       makeblastdb -in {output.db_input_fasta} -dbtype nucl -title all_genomes -out {params.db_prefix}
+       """
+
+#3)------------------------------RUN BLAST--------------------------------------
+
+#while running blast, filter out HSPs with pID < 75 and score < 200 and alignments shorter than 300 bp.
+#also filter out selfhits, and hits between species in a collapsed node
+rule blastn:
+    input:
+        fasta = OUT_DIR + "fasta_with_prot_domain_no_dupl/{genome}_with_prot_domain_no_dupl.fasta",
+        db = [
+            OUT_DIR + "db/all_genomes.00.nhr",
+            OUT_DIR + "db/all_genomes.00.nin",
+            OUT_DIR + "db/all_genomes.00.nsq",
+            OUT_DIR + "db/all_genomes.01.nhr",
+            OUT_DIR + "db/all_genomes.01.nin",
+            OUT_DIR + "db/all_genomes.01.nsq"]
+    output:
+        OUT_DIR + "blastn_output_raw/blastn_{genome}_TEs_versus_all_fungal_TEs.txt"
+    params:
+        threads = 4,
+        db = OUT_DIR + "db/all_genomes",
+        collapsed_nodes = COLLAPSED_NODES
+    threads: 10
+    shell:
+        """
+        temp_patterns=$(mktemp)
+
+        #create variable with combinations that should be filtered out
+        while IFS=$'\t' read -r query subject; do
+            echo -e "^${{query}}__.*\\t.*${{subject}}__" >> $temp_patterns
+            echo -e "^${{subject}}__.*\\t.*${{query}}__" >> $temp_patterns
+        done < {params.collapsed_nodes}
+
+        #also add self hits
+        echo -e "^{wildcards.genome}__.*\\t.*{wildcards.genome}__" >> $temp_patterns
+
+
+        #run blast
+
+
+        blastn -query {input.fasta} -task blastn -db {params.db} -outfmt 6 -num_threads {params.threads} -dbsize 10000000000 -evalue 10 \
+        -max_target_seqs 100000 | grep -v -E -f $temp_patterns | awk '{{if ($3>=75 && $4>=300 && $12>=200) print $0}}'  > {output}
+        """
+
+
+#4)--------------------------CHAIN BLAST HITS-----------------------------------
+rule chain_hsp:
+    input:
+        file = rules.blastn.output
+    output:
+        OUT_DIR + "blastn_chained/blastn_{genome}_TEs_versus_other_fungal_TEs_chained.txt"
+    params:
+        maxgap = MAXGAP,
+        maxoverlap = MAXOVERLAP
+    shell:
+        """
+        python combineBlastnHits.py -i {input.file} -o {output} -mg {params.maxgap} -mo {params.maxoverlap}
+        """
+
+#5)---------------FILTER FOR TE PROPORTION IN ALIGNMENT-------------------------
+rule alignment_cov:
+    input:
+        rules.chain_hsp.output
+    output:
+        kept_hits = OUT_DIR + "blastn_chained_alignment_cov/blastn_{genome}_TEs_versus_other_fungal_TEs_chained.txt",
+        removed_hits = temp(OUT_DIR + "number_of_hits_insufficient_alignment_coverage_{genome}.txt")
+    run:
+        removed_hits = 0
+
+        with open(str(input), 'r') as f, open(str(output.kept_hits), "w") as out:
+            for line in f:
+                col = line.split("\t")
+
+                #get lengths of both TEs
+                te1 = col[0].split(":")[-1].split("-")
+                len1 = int(te1[1]) - int(te1[0])
+                te2 = col[1].split(":")[-1].split("-")
+                len2 = int(te2[1]) - int(te2[0])
+
+                #get alignment lengths
+                qlen = int(col[7])-int(col[6])
+                slen = abs(int(col[8])-int(col[9]))
+
+                #check whether alignment length (alignment query is on te1,
+                #alignment subject is on te2) covers at least 60% of TE length
+                if qlen/len1 > 0.6 and slen/len2 > 0.6:
+                    out.write(line)
+                else:
+                    removed_hits += 1
+
+        #write number of hits removed due to insufficient alignment coverage to file
+        with open(str(output.removed_hits), "w") as file:
+            file.write(wildcards.genome + "\t" + str(removed_hits) + "\n")
+
+
+
+#combine all genome files containing number of hits removed (either due to collapsed_nodes
+#nodes, or insufficient alignment coverage)
+rule combine:
+    input:
+        align_cov = expand(OUT_DIR + "number_of_hits_insufficient_alignment_coverage_{genome}.txt", genome=GENOMES)
+    output:
+        align_cov = OUT_DIR + "number_of_hits_insufficient_alignment_coverage.txt"
+    shell:
+        """
+        cat {input.align_cov} > {output.align_cov}
+        """
+
+                #cat {input.collapsed_nodes} > {output.collapsed_nodes}
