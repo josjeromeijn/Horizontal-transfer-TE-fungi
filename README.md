@@ -36,3 +36,7 @@ The amount of jobs in this pipeline are too much to handle for Snakemake (>4 mil
 - mafft v7.505
 - PAL2NAL (v14)
 - R package seqinr (v.4.2-36)
+- python package numpy (v1.26.3)
+- python package biopython (1.78)
+
+### 4. TE vs TE blast
