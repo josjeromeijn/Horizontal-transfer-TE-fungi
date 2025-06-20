@@ -11,7 +11,9 @@ Scripts used to detect horizontal transfer of transposable elements (HTT) in 1,3
 
 ## General software versions used for all pipelines: 
 Snakemake v8.12.0
+
 Python package pandas v2.2.3
+
 Python package tqdm v4.67.1
 
 ## 1. Extraction of TEs from fungal genomes
