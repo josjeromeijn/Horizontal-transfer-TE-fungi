@@ -17,3 +17,10 @@ Python package pandas v2.2.3
 Python package tqdm v4.67.1
 
 ## 1. Extraction of TEs from fungal genomes
+BEDtools v2.31.1
+
+Transeq v6.6.0.0
+
+HMMER v3.4
+
+RPSTBLASTN v2.12.0+
