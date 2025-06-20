@@ -10,20 +10,16 @@ Scripts used to detect horizontal transfer of transposable elements (HTT) in 1,3
 7. Retrieving HTT-associated TEs
 
 ## General software versions used for all pipelines: 
-Snakemake v8.12.0
-
-Python package pandas v2.2.3
-
-Python package tqdm v4.67.1
+- Snakemake v8.12.0
+- Python package pandas v2.2.3
+- Python package tqdm v4.67.1
 
 ### 1. Extraction of TEs from fungal genomes
-BEDtools v2.31.1
-
-Transeq v6.6.0.0
-
-HMMER v3.4
-
-RPSTBLASTN v2.12.0+
+Make sure to only store .fasta files of fungal genomes included in this analysis in genome_folder, as the pipeline scans this directory for .fasta files for input. 
+- BEDtools v2.31.1
+- Transeq v6.6.0.0
+- HMMER v3.4
+- RPSTBLASTN v2.12.0+
 
 ### 2. BUSCO Ks estimations of genome comparisons
 
