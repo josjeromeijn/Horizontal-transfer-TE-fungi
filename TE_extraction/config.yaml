@@ -1,0 +1,7 @@
+genome_folder: "/your/path/"
+out_dir: "/your/path/"
+gff_folder: "/your/path/"
+
+#databases:
+cdd_db: "/your/path/to/database"
+pfam_db: "/your/path/to/database"
