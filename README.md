@@ -26,7 +26,7 @@ This pipeline starts by creating a file that identifies the best BUSCO gene comp
 <img width="400" height="350" alt="image" src="https://github.com/user-attachments/assets/e550adc2-45b7-4a71-8936-166649a909c4" />
 
 
-First, for node 20 is determined which fungal BUSCO set is most suitable (priority: class-level, order-level, phylum-level, kingdom-level BUSCO set). In this case, it is the kingdom-level BUSCO set, as the clades involves two different phyla. Next, for each BUSCO gene in the determined BUSCO set, the two longest copies of this BUSCO gene are searched in the two children clades (node 21 and node 22). For each BUSCO gene, the two longest copies of a member of each children clade is added to a list (`list_busco_seqs_species.txt`). In case of equal lengths, a random genome is chosen from each child clade. This procedure is carried out for each node in the tree (20, 21, 22, 23, 24).
+Let's take node 20 as an example. First, the most suitable BUSCO set is determined (priority: class-level, order-level, phylum-level, kingdom-level BUSCO set). In this case that's the kingdom-level BUSCO set, as the clades involves two different phyla. Next, for each BUSCO gene in the determined BUSCO set, the two longest copies of each BUSCO gene are searched in the two children clades (node 21 and node 22). This information is then added to a list (`list_busco_seqs_species.txt`). In case of equal lengths, a random genome is chosen from each child clade. This procedure is carried out for each node in the tree (20, 21, 22, 23, 24).
 
 Format of `list_busco_seqs_species.txt`:
 
@@ -36,7 +36,7 @@ e.g.:
 
 node1__Zymtr1__Phaal1__fungi__100957at4751
 
-The amount of jobs in this pipeline are too much to handle for Snakemake (>4 million BUSCO gene comparisons x 3 jobs). Therefore, we've found a work-around by giving a subset of BUSCO comparisons to Snakemake using a for-loop in bash (`run_snakemake_in_batches.sh`). It's not pretty, but it works. 
+Using this list, for each node, all the synonymous mutation rates of BUSCO genes are calculated. The amount of jobs in this pipeline are too much to handle for Snakemake (>4 million BUSCO gene comparisons x 3 jobs). Therefore, we've found a work-around by giving a subset of BUSCO comparisons to Snakemake using a for-loop in bash (`run_snakemake_in_batches.sh`). It's not pretty, but it works. 
 
 Software versions:
 - python package ete3 v.3.1.3
