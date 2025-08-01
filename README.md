@@ -68,6 +68,9 @@ Software version:
 - python package biopython v1.78
 
 
+After running this pipeline, the R-script `Ks_vs_ABL.R` (R v4.5.1, ggtree v4.4.3, patchwork v1.3.1, ggplot2 v3.5.2, treedataverse v0.0.1, stringr v1.5.1) can be used to obtain the 0.5% quantile of Ks distributions for each node in the tree. Note that this script is not part of the Snakefile. At the end, this script saves a file listing the node numbers (according to python `ete3`, the 0.5% quantiles, the nodeids (according to R `ggtree`), and all combinations possible within that treenode. An example of this file is included (`all_sp_sp_combinations.txt`). 
+
+
 
 ### 5 Clustering of candidate HTTs and counting of minimal TE transfer events 
 
