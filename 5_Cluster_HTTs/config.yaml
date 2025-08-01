@@ -1,0 +1,11 @@
+#if it's a folder or dir: make sure to end with "/"
+
+out_dir: "/your/path/"
+HTT_candidates: "/your/path/to/sign_Ks/candidate_HTTs.txt"
+collapsed_nodes: "/your/path/to/collapsed_sp_sp_combinations.txt" #generated with 2_BUSCO_Ks_tree_nodes/Ks_vs_ABL.R
+fasta_loc: "/your/path/"
+blast_loc: "/your/path/"
+collapsed_nodes_on_lines: "/your/path/to/collapsed_nodes_with_species.txt"
+classification: "/your/path/to/folder/containing/TE/annotations/per/genome"
+classification_curlib: "/your/path/to/2759.RepeatMasker.lib.annotations"
+tree_file: "/your/path/to/tree"
