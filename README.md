@@ -46,6 +46,8 @@ Software versions:
 - python package numpy v1.26.3
 - python package biopython v1.78
 
+After running this pipeline, the R-script `Ks_vs_ABL.R` (R v4.5.1, ggtree v4.4.3, patchwork v1.3.1, ggplot2 v3.5.2, treedataverse v0.0.1, stringr v1.5.1) can be used to obtain the 0.5% quantile of Ks distributions for each node in the tree. Note that this script is not part of the Snakefile. At the end, this script saves a file listing the node numbers (according to python `ete3`, the 0.5% quantiles, the nodeids (according to R `ggtree`), and all combinations possible within that treenode. An example of this file is included (`all_sp_sp_combinations.txt`). This file is needed for **4. Calculation of Ks of TE pairs to obtain candidate HTTs**.  
+
 ### 3. TE vs TE blast
 Make sure to only store .fasta files of fungal genomes included in this analysis in `genome_folder`, as the pipeline scans this directory for .fasta files for input. Also, it is important to note for further analyses that we removed completely identical TE sequences per genome to reduce the workload. For later analyses, these "duplicate" TEs will have to be manually added. 
 
@@ -66,9 +68,6 @@ Software version:
 - R package seqinr v.4.2-36
 - python package numpy v1.26.3
 - python package biopython v1.78
-
-
-After running this pipeline, the R-script `Ks_vs_ABL.R` (R v4.5.1, ggtree v4.4.3, patchwork v1.3.1, ggplot2 v3.5.2, treedataverse v0.0.1, stringr v1.5.1) can be used to obtain the 0.5% quantile of Ks distributions for each node in the tree. Note that this script is not part of the Snakefile. At the end, this script saves a file listing the node numbers (according to python `ete3`, the 0.5% quantiles, the nodeids (according to R `ggtree`), and all combinations possible within that treenode. An example of this file is included (`all_sp_sp_combinations.txt`). 
 
 
 
