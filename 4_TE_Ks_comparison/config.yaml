@@ -1,0 +1,9 @@
+#in case of directory: make sure to end with "/"
+
+TE_vs_TE_folder: "/home/josje/NOBINFBACKUP/TE_vs_TE_blast/output/blastn_chained_alignment_cov/"
+out_dir: "/home/josje/NOBINFBACKUP/TE_Ks_comparison/output_new_blast/"
+prot_domain_loc_hmm: "/home/josje/NOBINFBACKUP/TE_extraction/protein_domains/hmmscan/"
+prot_domain_loc_rps: "/home/josje/NOBINFBACKUP/TE_extraction/protein_domains/rpstblastn/"
+te_translated_orf_loc: "/home/josje/NOBINFBACKUP/TE_extraction/translated/"
+fasta_loc: "/home/josje/NOBINFBACKUP/TE_extraction/"
+quantile_file: "/home/josje/scripts/BUSCO_Ks_tree_nodes/all_sp_sp_combinations.txt"
