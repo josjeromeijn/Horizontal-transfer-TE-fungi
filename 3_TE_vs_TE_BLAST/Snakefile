@@ -100,7 +100,7 @@ def get_headers_of_seq_with_prot_domain(hmm_scan_output,rps_output):
 rule all:
     input:
         expand(OUT_DIR + "blastn_chained/blastn_{genome}_TEs_versus_other_fungal_TEs_chained.txt", genome=GENOMES),
-        OUT_DIR + "number_of_hits_insufficient_alignment_coverage.txt"
+        OUT_DIR + "splitted_files/blastn_part_000.txt
 
 
 
@@ -257,16 +257,18 @@ rule alignment_cov:
 
 
 
-#combine all genome files containing number of hits removed (either due to collapsed_nodes
-#nodes, or insufficient alignment coverage)
+#combine all blast hits and make sure only one direction of bi-directional hits are kept (A-B and B-A: only keep A-B)
 rule combine:
     input:
-        align_cov = expand(OUT_DIR + "number_of_hits_insufficient_alignment_coverage_{genome}.txt", genome=GENOMES)
+        expand(OUT_DIR + "blastn_chained_alignment_cov/blastn_{genome}_TEs_versus_other_fungal_TEs_chained.txt", genome=GENOMES)
     output:
-        align_cov = OUT_DIR + "number_of_hits_insufficient_alignment_coverage.txt"
+        temp(all_hits = OUT_DIR + "blastn_chained_alignment_cov_all_genomes.txt"),
+        splitted_hits = OUT_DIR + "splitted_files/blastn_part_000.txt
+    params: 
+        OUT_DIR + "splitted_files/blastn_part_"
     shell:
         """
-        cat {input.align_cov} > {output.align_cov}
+        awk '!seen[$1, $2]++ && !seen[$2, $1]++' {input} > {output.all_hits}
+        split -l4000 -d -a 3 --additional-suffix=.txt {output.all_hits} {params}
         """
 
-                #cat {input.collapsed_nodes} > {output.collapsed_nodes}
