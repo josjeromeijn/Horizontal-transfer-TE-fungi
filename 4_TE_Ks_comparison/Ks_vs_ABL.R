@@ -257,13 +257,6 @@ lines <- sapply(nodes_to_collapse$sp, function(x) paste(x, collapse = ' '))
 writeLines(lines, con = "collapsed_nodes_with_species.txt")
 write.table(nodes_to_collapse, file="collapsed_nodes_with_species.txt", row.names=FALSE, quote=FALSE, sep = "\t")
 
-#for each node, find all the tips (=offspring), and calculate number of possible
-#species-species comparisons in this clade (ncol(combn)), and take sum of this
-#to get all species-species comparisons that are collapsed
-collapsed_sp_sp_comp <- sum(sapply(nodes_to_collapse$node_ids, function(i) ncol(combn(length(offspring(tree, i)), 2))))
-
-#!!!!!!!!! GOES WRONG BECAUSE IT ALSO COUNTS INTERNAL NODES!!!!!!!!!!
-
 
 #get list of sp-sp comparisons that will be collapsed
 comb<- sapply(nodes_to_collapse$node_ids, function(i) {
