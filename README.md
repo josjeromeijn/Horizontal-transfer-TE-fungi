@@ -26,7 +26,7 @@ This pipeline starts by creating a file that identifies the best BUSCO gene comp
 First, for node 20 is determined which fungal BUSCO set is most suitable (priority: class-level, order-level, phylum-level, kingdom-level BUSCO set). In this case, it is the kingdom-level BUSCO set, as the clades involves two different phyla. Next, for each BUSCO gene in the determined BUSCO set, the two longest copies of this BUSCO gene are searched in the two children clades (node 21 and node 22). For each BUSCO gene, the two longest copies of a member of each children clade is added to a list. In case of equal lengths, a random genome is chosen from each child clade.
 
 Format of `list_busco_seqs_species.txt`:
-{node_name}__.{species1}__.{species2}__.{busco_set}__.{busco_gene}
+node_name__species1__species2__busco_set__busco_gene
 e.g.:
 node1__Zymtr1__Phaal1__fungi__100957at4751
 
