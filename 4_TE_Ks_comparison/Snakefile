@@ -1,0 +1,91 @@
+###25-04-24 by Josje Romeijn
+#Snakefile to calculate Ks values of TEs
+#Stores these values per genome, and per tree node (that both host species share)
+
+#Load config file and packages
+configfile: "config.yaml"
+import os
+from collections import defaultdict
+from snakemake.utils import makedirs
+import pandas as pd
+
+
+OUT_DIR=config["out_dir"]
+TE_vs_TE_FOLDER=config["TE_vs_TE_folder"]
+PROT_DOMAIN_LOC_HMM=config["prot_domain_loc_hmm"]
+PROT_DOMAIN_LOC_RPS=config["prot_domain_loc_rps"]
+TE_TRANSLATED_ORF_LOC=config["te_translated_orf_loc"]
+FASTA_LOC=config["fasta_loc"]
+QUANTILE_FILE=config["quantile_file"]
+
+#load in quantile file
+qnt = pd.read_csv(QUANTILE_FILE, sep = '\t')
+
+
+for file in os.listdir(OUT_DIR + "splitted_files/"):
+    if file.endswith(".txt"):
+        if not file.endswith("part_01309.txt"):
+            genome_name = file.split(".txt")[0]
+            GENOMES.append(genome_name)
+
+rule all:
+    input:
+        expand(OUT_DIR + "sign_Ks/{genome}_hits_sign_Ks.txt", genome = GENOMES)
+
+
+
+
+
+
+
+
+#3-----------------PREPARE FILES FOR BLAST SEARCHES----------------------------
+
+rule calculate_ks:
+    input:
+        OUT_DIR + "splitted_files/{genome}.txt"
+    output:
+        OUT_DIR + "Ks/{genome}_hits_Ks.txt"
+    shell:
+        """
+        python calculate_Ks_TE_hit.py -b {input} -hm {PROT_DOMAIN_LOC_HMM} -r {PROT_DOMAIN_LOC_RPS} -t {TE_TRANSLATED_ORF_LOC} -f {FASTA_LOC} -o {OUT_DIR} -k {output}
+        """
+
+rule compare_ks_node:
+    input:
+        rules.calculate_ks.output
+    output:
+        sign = OUT_DIR + "sign_Ks/{genome}_hits_sign_Ks.txt",
+        insign = OUT_DIR + "insign_Ks/{genome}_hits_insign_Ks.txt"
+    run:
+
+
+        #go over input file; check per TE-TE pair whether it is below or above Ks quantile of that node
+        with open(str(input), 'r') as input, open(str(output.sign + "_tmp"), 'a') as sign, open(str(output.insign + "_tmp"), 'a') as insign:
+            for line in input:
+                ka, ks, vka, vks, qry, sbj, _ = line.split("\t")
+                qry_sp = qry.split("__")[0]
+                sbj_sp = sbj.split("__")[0]
+
+                #find index of
+                idx = qnt.index[(qnt['comb'] == f"{qry_sp}__{sbj_sp}") | (qnt['comb'] == f"{sbj_sp}__{qry_sp}")].tolist()
+                if len(idx) != 1:
+                    print("problematic qry-sbj combination")
+                    print(f"idx of qry-sbj comb is {idx}")
+                else:
+                    if float(qnt.loc[idx[0], 'quantile']) > (float(ks) + 2 * float(vks)): #TE has sign lower Ks than BUSCO's (ks + 2*standard deviation ks)
+                        sign.write(f"{ka}\t{ks}\t{vka}\t{vks}\t{qry}\t{sbj}\t{qnt.loc[idx[0], 'comb']}\t{qnt.loc[idx[0], 'nodes']}\t{qnt.loc[idx[0], 'quantile']}\n")
+                    else: #TE does NOT have sign lower Ks than BUSCO's
+                        insign.write(f"{ka}\t{ks}\t{vka}\t{vks}\t{qry}\t{sbj}\t{qnt.loc[idx[0], 'comb']}\t{qnt.loc[idx[0], 'nodes']}\t{qnt.loc[idx[0], 'quantile']}\n")
+
+        #after completion, rename temporary files to final files
+        os.rename(output.sign + "_tmp", output.sign)
+        os.rename(output.insign + "_tmp", output.insign)
+
+
+#TE-TE comparison can be lost due:
+    #1 not having prot domains in common
+    #2 having protein domains in common, but not/partially in alignment (hits must have protein domain >300bp in alignment)
+    #3 having protein domains in common, but query & subject coords overlap <100 aa in domain sequence
+    #3 double comparisons (TE1 vs TE2 AND TE2 vs TE1)
+    #4
