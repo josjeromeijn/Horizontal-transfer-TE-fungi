@@ -1,0 +1,248 @@
+###25-04-24 by Josje Romeijn
+#Snakefile to run TE_vs_TE blast comparisons
+
+#Load config file and packages
+configfile: "config.yaml"
+import os
+import subprocess
+from collections import defaultdict
+from snakemake.utils import makedirs
+from collections import Counter
+
+OUT_DIR=config["out_dir"]
+HTT_CAN=config["HTT_candidates"]
+COLLAPSED_NODES = config["collapsed_nodes"]
+FASTA_LOC = config["fasta_loc"]
+BLAST_LOC = config["blast_loc"]
+COLLAPSED_NODES_ON_LINES = config["collapsed_nodes_on_lines"]
+CLASSIFICATION=config["classification"]
+CLASSIFICATION_CURLIB=config["classification_curlib"]
+TREE_FILE=config["tree_file"]
+
+#load in collapsed nodes
+clade_dict = {}
+with open(COLLAPSED_NODES, 'r') as file:
+    for index, line in enumerate(file, start =1):
+        clade_dict[f"clade{index}"] = line.strip().split()
+
+#after criterion1, make a list with all the generated output files (this is not
+#easily determined within snakemake, therefore I applied this short-cut)
+#load in edges files
+FILES = []
+if os.path.exists(OUT_DIR + "edges/"): #if clustering rule has ran:
+    for file in os.listdir(OUT_DIR + "edges/"):
+        if file.endswith(".csv"):
+            FILES.append(file.replace("Criterion1__","").replace(".csv",""))
+else: #if clustering rule did not run yet:
+    FILES = ["Acema1--Phisu1"]
+
+#print(FILES)
+
+#Rule for creating output file
+rule all:
+    input:
+        OUT_DIR + "blastn/blastn_within_clades.txt",
+        OUT_DIR + "MCL_input_file.txt",
+        OUT_DIR + "edges/Criterion1__Acema1--Phisu1.csv",
+        OUT_DIR + "nodes.csv",
+        expand(OUT_DIR + "communities/comm_{file}.csv", file = FILES),
+        OUT_DIR + "hit_communities/minimal_number_HTTs.txt"
+
+
+#1)-------------PREPARE FILES FOR WIHTIN GENOME BLAST SEARCH--------------------
+
+#from can_htt file, get all TEs involved in the candidate HTT hits.
+#split up this larger file per genome, and extract these sequences from original
+#fasta TE files of genomes (=FASTA_LOC).
+rule input_blast_within_genomes:
+    input:
+        htt_can = HTT_CAN,
+        fastas = FASTA_LOC
+    output:
+        all_fasta = OUT_DIR + "input_blastn/tes_passing_ks_filter.fasta"
+    params:
+        fasta_headers_all = OUT_DIR + "headers/fasta_headers.txt"
+    shell:
+        """
+        #first, retrieve all TE headers from the candidate HTT file
+        awk -F'\t' 'NR > 1 {{print $3 \"\\n\" $4}}' {input.htt_can} | sort | uniq > {params.fasta_headers_all}
+
+        #next, create files per genome with list of TE headers involved in HTTs
+        awk -F'__' '{{print $1}}' {params.fasta_headers_all} | sort -u | xargs -I {{}} sh -c "grep '^{{}}__' {params.fasta_headers_all} > {OUT_DIR}headers/{{}}.txt"
+
+        #to save memory, delete parameters
+        rm {params.fasta_headers_all}
+
+        #create empty file to store results
+        touch {output.all_fasta}
+
+        #per genome file with TE headers, extract fasta seqs
+        for file in {OUT_DIR}headers/*; do
+            base_name=${{file##*/}}
+            base_name=${{base_name%.txt}}
+            xargs -a ${{file}} -I {{}} samtools faidx {input.fastas}/${{base_name}}_with_prot_domain_no_dupl.fasta {{}} >> {output.all_fasta}
+        done
+        """
+
+
+
+#2)----------------------CREATE DATABASE---------------------------------------
+rule create_databases:
+    input:
+        rules.input_blast_within_genomes.output.all_fasta
+    params:
+        db_prefix="tes_passing_ks",
+        db_loc=OUT_DIR + "db/tes_passing_ks"
+    output:
+        db_files=[
+            OUT_DIR + "db/tes_passing_ks.nhr",
+            OUT_DIR + "db/tes_passing_ks.nin",
+            OUT_DIR + "db/tes_passing_ks.nsq"]
+    shell:
+        """
+        makeblastdb -in {input} -dbtype nucl -title {params.db_prefix} -out {params.db_loc}
+        """
+
+#3)------------------------------RUN BLAST--------------------------------------
+
+#while running blast, filter out HSPs with pID < 75 and score < 200 and alignments shorter than 300 bp.
+#also filter out selfhits, and hits between species in a collapsed node
+rule blastn:
+    input:
+        fasta = rules.input_blast_within_genomes.output.all_fasta,
+        db = rules.create_databases.output.db_files
+    output:
+        OUT_DIR + "blastn/blastn_within_clades.txt"
+    params:
+        db = OUT_DIR + "db/tes_passing_ks",
+        collapsed_nodes = COLLAPSED_NODES
+    threads: workflow.cores,
+    shell:
+        """
+        temp_patterns=$(mktemp)
+
+        #create variable with combinations that should be filtered out
+        while IFS=$'\t' read -r query subject; do
+            echo -e "^${{query}}__.*\\t.*${{subject}}__" >> $temp_patterns
+            echo -e "^${{subject}}__.*\\t.*${{query}}__" >> $temp_patterns
+        done < {params.collapsed_nodes}
+
+        #run blast. filter self-hits with awk and store in tmp file, filter clade hits with grep and store in different tmp file
+        blastn -query {input.fasta} -task blastn -db {params.db} -outfmt 6 -num_threads {threads} -dbsize 10000000000 -evalue 10 \
+        -max_target_seqs 600000 | \
+        awk -v output="{output}_tmp" '{{
+            split($1, a, "__")
+            split($2, b, "__")
+            if ($4 >= 100 && a[1] == b[1]) {{
+                print $0 > output
+            }} else {{
+                print $0}}}}' | \
+        grep -E -f $temp_patterns > {output}_tmp2
+
+        #merge tmp files
+        cat {output}_tmp {output}_tmp2 > {output}
+        rm {output}_tmp*
+        """
+
+
+#4)------------------------PREPARE CRITERION 1----------------------------------
+#essentially extends the can_htt file, not only contains can_htt, but get pID from blast file
+#run a script that was initally written to generate MCL clustering input file
+
+rule prepare_criterion1:
+    input:
+        blast_loc = BLAST_LOC,
+        ks = HTT_CAN
+    output:
+        OUT_DIR + "MCL_input_file.txt"
+    shell:
+        """
+        python create_mcl_input.py -b {input.blast_loc} -ks {input.ks} -o {output}
+        """
+
+
+#5)--------------------------CRITERION 1----------------------------------------
+#get all nodes into one file with their classifications
+
+rule nodes_file:
+    input: rules.prepare_criterion1.output
+    params:
+        classification_earlgray = CLASSIFICATION,
+        classification_curlib = CLASSIFICATION_CURLIB
+    output: OUT_DIR + "nodes.csv"
+    shell:
+        """
+        python create_edges_file.py -i {input} -o {output} -c {params.classification_earlgray} -cc {params.classification_curlib}
+        """
+
+#execute criterion1 and generate edges files for each clade pair
+rule criterion1:
+    input:
+        col_nodes = COLLAPSED_NODES_ON_LINES,
+        blast_within = rules.blastn.output,
+        #blast_within = OUT_DIR + "blastn/short_tmp_blast_file",
+        ks = rules.prepare_criterion1.output,
+        mcl_nodes = rules.nodes_file.output
+    output:
+        OUT_DIR + "edges/Criterion1__Acema1--Phisu1.csv",
+        OUT_DIR + "nodes/Acema1--Phisu1.csv"
+    params:
+        out_dir = OUT_DIR + "edges/Criterion1_",
+        nodes_output = OUT_DIR + "nodes/"
+    threads: 0.25 * workflow.cores
+    shell:
+        """
+        python first_clustering.py -e {params.out_dir} -bw {input.blast_within} -c {input.col_nodes} -ks {input.ks} -t {threads} -n {input.mcl_nodes} -no {params.nodes_output}
+        """
+
+
+
+
+
+
+#6)--------------------CLUSTERING OF TE EXPANSIONS------------------------------
+#perform fast greedy clustering of TEs to form hit communities (per clade pair)
+rule clustering:
+    input:
+        OUT_DIR + "edges/Criterion1__{file}.csv"
+    output:
+        communities = OUT_DIR + "communities/comm_{file}.csv",
+        TEs = OUT_DIR + "communities/comm_{file}_TEs.csv"
+    params:
+        nodes = OUT_DIR + "nodes/{file}.csv",
+        output = OUT_DIR + "communities/comm_{file}"
+    shell:
+        """
+        python cluster_fast_greedy.py -e {input} -n {params.nodes} -o {params.output}
+        """
+
+#7)---------------------COUNTING MINIMAL HTT EVENTS-----------------------------
+#perform single linkage clustering on hit communities of ALL clade pairs
+#hit communities are connected if at least 1 TE overlaps
+rule scl_hit_communities:
+    input:
+        expand(OUT_DIR + "communities/comm_{file}_TEs.csv", file = FILES)
+    output:
+        edges = OUT_DIR + "hit_communities/edges_hit_communities.csv",
+        nodes = OUT_DIR + "hit_communities/nodes_hit_communities.csv",
+        comm = OUT_DIR + "hit_communities/clusters_hit_communities.csv"
+    params:
+        input = OUT_DIR + "communities/",
+        output = OUT_DIR + "hit_communities/"
+    shell:
+        """
+        python SCL_hit_communities.py -i {params.input} -o {params.output}
+        """
+
+#from these cluster of hit communities, count the minimal number of HTTs
+rule count_htts:
+    input:
+        tree = TREE_FILE,
+        clusters = rules.scl_hit_communities.output.comm,
+        collapsed_clades = COLLAPSED_NODES_ON_LINES
+    output:
+        OUT_DIR + "hit_communities/"
+    shell:
+        """
+        python count_min_HTTs.py -t {input.tree} -c {input.clusters} -cl {input.collapsed_clades} -o {output}
+        """
