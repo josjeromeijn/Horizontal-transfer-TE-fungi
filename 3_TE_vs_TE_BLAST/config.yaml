@@ -1,9 +1,9 @@
-#a folder or dir? --> make sure to end with "/"
+#a folder/dir? --> make sure to end with "/"
 
 TE_folder: "/your/path/"
 out_dir: "/your/path/"
 protein_domain_dir: "/your/path/"
-genomes_without_TE_with_prot_domain: [list of genomes without TEs encoding protein domain]
+genomes_without_TE_with_prot_domain: [list of genomes without TEs encoding protein domains]
 collapsed_nodes: "/your/path/to/file.txt"
 maxgap: 600
 maxoverlap: 600
