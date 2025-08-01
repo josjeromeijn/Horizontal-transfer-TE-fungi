@@ -1,0 +1,19 @@
+#example structure of this file
+
+nodes   quantile        nodeid  comb
+1       1.09393967047816        1349    Rozal1_1__Parsed1
+1       1.09393967047816        1349    Rozal1_1__Allma1
+1       1.09393967047816        1349    Rozal1_1__Blabri1
+1       1.09393967047816        1349    Rozal1_1__Catan2
+1       1.09393967047816        1349    Rozal1_1__Caupr_SCcomb
+1       1.09393967047816        1349    Rozal1_1__Caupr1
+1       1.09393967047816        1349    Rozal1_1__Clarep1_1
+1       1.09393967047816        1349    Rozal1_1__Polagg1_1
+1       1.09393967047816        1349    Rozal1_1__Blyhe1
+1       1.09393967047816        1349    Rozal1_1__Gaesem1
+1       1.09393967047816        1349    Rozal1_1__Spipu1
+1       1.09393967047816        1349    Rozal1_1__Triarc1
+1       1.09393967047816        1349    Rozal1_1__Fimjon1
+1       1.09393967047816        1349    Rozal1_1__Powhir1
+1       1.09393967047816        1349    Rozal1_1__Gervar1
+1       1.09393967047816        1349    Rozal1_1__Glopol1
