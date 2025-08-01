@@ -6,4 +6,4 @@ prot_domain_loc_hmm: "/your/path/" #output from TE_extraction
 prot_domain_loc_rps: "/your/path/" #output from TE_extraction
 te_translated_orf_loc: "/your/path/" #output from TE_extraction
 fasta_loc: "/your/path/"
-quantile_file: "/home/josje/scripts/BUSCO_Ks_tree_nodes/all_sp_sp_combinations.txt"
+quantile_file: "/your/path/to/all_sp_sp_combinations.txt" #see 2_BUSCO_Ks_tree_nodes/Ks_vs_ABL.R
