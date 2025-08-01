@@ -44,15 +44,17 @@ Software versions:
 - PAL2NAL v14
 - R package seqinr v.4.2-36
 - python package numpy v1.26.3
-- python package biopython 1.78
+- python package biopython v1.78
 
 ### 3. TE vs TE blast
 Make sure to only store .fasta files of fungal genomes included in this analysis in `genome_folder`, as the pipeline scans this directory for .fasta files for input. Also, it is important to note for further analyses that we removed completely identical TE sequences per genome to reduce the workload. For later analyses, these "duplicate" TEs will have to be manually added. 
 
-From the BUSCO comparisons, we estimated which nodes in the tree contain species that are too recently diverged to detect horizontal transfer (referred to as "collapsed nodes"). We've compiled a list of all species comparisons that are for that reason excluded from further analysis (`collapsed_sp_sp_combinations.txt`). TE blast hits involving TEs of a collapsed node are therefore filtered out, as well as "self"-hits (TE hits between TEs residing in the same genome). TE blast hits are then chained if they involve the same two TEs, their gap is <400 bp and overlap smaller than 100 bp. 
+From the BUSCO comparisons, we estimated which nodes in the tree contain species that are too recently diverged to detect horizontal transfer (referred to as "collapsed nodes"). We've compiled a list of all species comparisons that are for that reason excluded from further analysis (`collapsed_sp_sp_combinations.txt`). TE blast hits involving TEs of a collapsed node are therefore filtered out, as well as "self"-hits (TE hits between TEs residing in the same genome). TE blast hits are then chained if they involve the same two TEs, their gap is <600 bp and overlap <600 bp. Next, only TE hits are retained where the alignment covers >60% of the length of both TEs. 
 
-
-
-Software version:
+Software versions: 
+- BLAST 2.12.0+
+- python package collections v3.13.5
 - python package numpy v1.26.3
-- BLAST (v2.12.0+)
+
+### 4. Calculation of Ks of TE pairs to obtain candidate HTTs 
+
