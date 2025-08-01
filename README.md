@@ -26,7 +26,7 @@ This pipeline starts by creating a file that identifies the best BUSCO gene comp
 <img width="400" height="350" alt="image" src="https://github.com/user-attachments/assets/e550adc2-45b7-4a71-8936-166649a909c4" />
 
 
-First, for node 20 is determined which fungal BUSCO set is most suitable (priority: class-level, order-level, phylum-level, kingdom-level BUSCO set). In this case, it is the kingdom-level BUSCO set, as the clades involves two different phyla. Next, for each BUSCO gene in the determined BUSCO set, the two longest copies of this BUSCO gene are searched in the two children clades (node 21 and node 22). For each BUSCO gene, the two longest copies of a member of each children clade is added to a list. In case of equal lengths, a random genome is chosen from each child clade. This procedure is carried out for each node in the tree (20, 21, 22, 23, 24)
+First, for node 20 is determined which fungal BUSCO set is most suitable (priority: class-level, order-level, phylum-level, kingdom-level BUSCO set). In this case, it is the kingdom-level BUSCO set, as the clades involves two different phyla. Next, for each BUSCO gene in the determined BUSCO set, the two longest copies of this BUSCO gene are searched in the two children clades (node 21 and node 22). For each BUSCO gene, the two longest copies of a member of each children clade is added to a list (`list_busco_seqs_species.txt`). In case of equal lengths, a random genome is chosen from each child clade. This procedure is carried out for each node in the tree (20, 21, 22, 23, 24).
 
 Format of `list_busco_seqs_species.txt`:
 
@@ -49,7 +49,7 @@ Software versions:
 ### 3. TE vs TE blast
 Make sure to only store .fasta files of fungal genomes included in this analysis in `genome_folder`, as the pipeline scans this directory for .fasta files for input. Also, it is important to note for further analyses that we removed completely identical TE sequences per genome to reduce the workload. For later analyses, these "duplicate" TEs will have to be manually added. 
 
-From the BUSCO comparisons, we estimated which nodes in the tree contain species that are too recently diverged to detect horizontal transfer (referred to as "collapsed nodes"). We've compiled a list of all species comparisons that are for that reason excluded from further analysis (`collapsed_sp_sp_combinations.txt`). 
+From the BUSCO comparisons, we estimated which nodes in the tree contain species that are too recently diverged to detect horizontal transfer (referred to as "collapsed nodes"). We've compiled a list of all species comparisons that are for that reason excluded from further analysis (`collapsed_sp_sp_combinations.txt`). TE blast hits involving TEs of a collapsed node are therefore filtered out, as well as "self"-hits (TE hits between TEs residing in the same genome). TE blast hits are then chained if they involve the same two TEs, their gap is <400 bp and overlap smaller than 100 bp. 
 
 
 
