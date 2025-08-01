@@ -49,12 +49,26 @@ Software versions:
 ### 3. TE vs TE blast
 Make sure to only store .fasta files of fungal genomes included in this analysis in `genome_folder`, as the pipeline scans this directory for .fasta files for input. Also, it is important to note for further analyses that we removed completely identical TE sequences per genome to reduce the workload. For later analyses, these "duplicate" TEs will have to be manually added. 
 
-From the BUSCO comparisons, we estimated which nodes in the tree contain species that are too recently diverged to detect horizontal transfer (referred to as "collapsed nodes"). We've compiled a list of all species comparisons that are for that reason excluded from further analysis (`collapsed_sp_sp_combinations.txt`). TE blast hits involving TEs of a collapsed node are therefore filtered out, as well as "self"-hits (TE hits between TEs residing in the same genome). TE blast hits are then chained if they involve the same two TEs, their gap is <600 bp and overlap <600 bp. Next, only TE hits are retained where the alignment covers >60% of the length of both TEs. 
+From the BUSCO comparisons, we estimated which nodes in the tree contain species that are too recently diverged to detect horizontal transfer (referred to as "collapsed nodes"). We've compiled a list of all species comparisons that are for that reason excluded from further analysis (`collapsed_sp_sp_combinations.txt`). TE blast hits involving TEs of a collapsed node are therefore filtered out, as well as "self"-hits (TE hits between TEs residing in the same genome). TE blast hits are then chained if they involve the same two TEs, their gap is <600 bp and overlap <600 bp. Next, only TE hits are retained where the alignment covers >60% of the length of both TEs. Finally, all TE hits are combined into a single file, after which only one copy of bidirectional TE hits is kept (only keep TE1_sp1 -- TE2_sp2 instead of also keeping TE2_sp2 -- TE1_sp1). This file is then split in multiple files containing max 4000 lines for further analysis. 
 
 Software versions: 
 - BLAST 2.12.0+
 - python package collections v3.13.5
 - python package numpy v1.26.3
+  
 
 ### 4. Calculation of Ks of TE pairs to obtain candidate HTTs 
+A custom python script (`calculate_Ks_TE_hit.py`) determines per TE hit whether there are any TE-related protein domains that overlap and determines the synonymous mutation rate of these TE-related protein domains (must be at minimum 100bp alignment). It takes into account that TE blast hits can be forward-forward or forward-reverse and makes sure TE-related protein domains are at the **exact** same location in the alignment and that the protein domains are in the right ORF compared to the alignment. Frameshift mutations are ruled out due to how HMMER and RPSTBLASTN perform protein calling. Be aware that the `calculate_Ks_TE_hit.py` script can take quite a while, depending on the size of your dataset. For 7 million TE pairs it ran a couple of weeks (using 90 threads simulatenously). 
+
+Software version:
+- mafft v7.505
+- PAL2NAL v14
+- R package seqinr v.4.2-36
+- python package numpy v1.26.3
+- python package biopython v1.78
+
+
+
+### 5 Clustering of candidate HTTs and counting of minimal TE transfer events 
+
 
