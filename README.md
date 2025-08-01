@@ -26,11 +26,14 @@ This pipeline starts by creating a file that identifies the best BUSCO gene comp
 First, for node 20 is determined which fungal BUSCO set is most suitable (priority: class-level, order-level, phylum-level, kingdom-level BUSCO set). In this case, it is the kingdom-level BUSCO set, as the clades involves two different phyla. Next, for each BUSCO gene in the determined BUSCO set, the two longest copies of this BUSCO gene are searched in the two children clades (node 21 and node 22). For each BUSCO gene, the two longest copies of a member of each children clade is added to a list. In case of equal lengths, a random genome is chosen from each child clade.
 
 Format of `list_busco_seqs_species.txt`:
+
 node_name__species1__species2__busco_set__busco_gene
+
 e.g.:
+
 node1__Zymtr1__Phaal1__fungi__100957at4751
 
-The amount of jobs in this pipeline are too much to handle for Snakemake (>4 million BUSCO gene comparisons x 3 jobs). Therefore, we've found a work-around by giving a subset of BUSCO comparisons to Snakemake using a for-loop in bash (`run_snakemake_in_batches.sh`). 
+The amount of jobs in this pipeline are too much to handle for Snakemake (>4 million BUSCO gene comparisons x 3 jobs). Therefore, we've found a work-around by giving a subset of BUSCO comparisons to Snakemake using a for-loop in bash (`run_snakemake_in_batches.sh`). It's not pretty, but it works. 
 
 Software versions:
 - python package ete3 v.3.1.3
@@ -41,7 +44,7 @@ Software versions:
 - python package biopython 1.78
 
 ### 3. TE vs TE blast
-Make sure to only store .fasta files of fungal genomes included in this analysis in `genome_folder`, as the pipeline scans this directory for .fasta files for input. Also, it is important to note for further analyses that we removed completely identical TE sequences per genome to reduce the workload. 
+Make sure to only store .fasta files of fungal genomes included in this analysis in `genome_folder`, as the pipeline scans this directory for .fasta files for input. Also, it is important to note for further analyses that we removed completely identical TE sequences per genome to reduce the workload. For later analyses, these "duplicate" TEs will have to be manually added. 
 
 From the BUSCO comparisons, we estimated which nodes in the tree contain species that are too recently diverged to detect horizontal transfer (referred to as "collapsed nodes"). We've compiled a list of all species comparisons that are for that reason excluded from further analysis (`collapsed_sp_sp_combinations.txt`). 
 
