@@ -82,8 +82,6 @@ Software versions:
 - BLAST 2.12.0+
 - python package collections v3.13.5
 - python package numpy v1.26.3
-- python package pandas v2.2.3
-- python package tqdm v4.65.0 
 - python package ete3 v.3.1.3
 - python package igraph v0.11.8
 - python package leidenalg v0.10.2
