@@ -78,6 +78,8 @@ With TE-TE hits as nodes and TE-TE hit connections as edges per clade-clade comp
 
 Next, using single linkage clustering, hit communities were connected if they shared at least 1 TE (`SCL_hit_communities.py`). These clusters of hit communities were then projected onto the tree and used to count the minimal number of HTT events needed to explain the data (`count_min_HTTs.py`).  
 
+Note that classifications for TEs are needed in this pipeline. We've constructed these files for de novo TEs per genome, with TE family name in column 1 and TE classifications on order, superfamily and family level in column 7, 8, and 9, respectively. We've used the Repeatmasker classification as well as classifications from PASTEC for this. In case of conflicting classifications, Repeatmasker was favored. For the TEs annotated from the Repeatmasker library (`2759.RepeatMasker.lib`), we've constructed a similar file for the annotations of the TE consensus sequences of the library. 
+
 Software versions: 
 - BLAST 2.12.0+
 - python package collections v3.13.5
@@ -88,3 +90,8 @@ Software versions:
 - python package networkX v2.5.1
 
 ### 6. Retrieving HTT-associated TEs
+To be able to infer the proportion of TEs likely associated with horizontal transfer, we clustered all TEs per genome using MMseqs2. We labelled clusters containing a TE involved in transfer as "associated with horizontal transfer". Next, we extract all the TEs per genome that are associated with horizontal transfer. Nested or overlapping TEs are counted only once.
+
+Software versions: 
+- BEDtools v2.31.1
+- MMseqs2 15.6f452
