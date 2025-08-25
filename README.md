@@ -26,7 +26,7 @@ This pipeline starts by creating a file that identifies the best BUSCO gene comp
 <img width="400" height="350" alt="image" src="https://github.com/user-attachments/assets/e550adc2-45b7-4a71-8936-166649a909c4" />
 
 
-Let's take node 20 as an example. First, the most suitable BUSCO set is determined (priority: class-level, order-level, phylum-level, kingdom-level BUSCO set). In this case that's the kingdom-level BUSCO set, as the clades involves two different phyla. Next, for each BUSCO gene in the determined BUSCO set, the two longest copies of each BUSCO gene are searched in the two children clades (node 21 and node 22). This information is then added to a list (`list_busco_seqs_species.txt`). In case of equal lengths, a random genome is chosen from each child clade. This procedure is carried out for each node in the tree (20, 21, 22, 23, 24).
+Let's take node 20 as an example. First, the most suitable BUSCO set is determined (priority: class-level, order-level, phylum-level, kingdom-level BUSCO set). In this case that's the kingdom-level BUSCO set, as the clades involve two different phyla. Next, for each BUSCO gene in the determined BUSCO set, the two longest copies of each BUSCO gene are searched in the two children clades (node 21 and node 22). This information is then added to a list (`list_busco_seqs_species.txt`). In case of equal lengths, a random genome is chosen from each child clade. This procedure is carried out for each node in the tree (20, 21, 22, 23, 24).
 
 Format of `list_busco_seqs_species.txt`:
 
