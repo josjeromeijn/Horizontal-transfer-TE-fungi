@@ -3,8 +3,8 @@
 genome_folder: "/your/path/"
 gff_folder: "/your/path/"
 out_dir: "/your/path/"
-classification_dir: "/your/path/"
-curlib_dir: "/your/path/"
+classification: "/your/path/to/folder/containing/TE/annotations/per/genome"
+classification_curlib: "/your/path/to/2759.RepeatMasker.lib.annotations"
 community_folder: "/your/path/" #output folder of 5_Cluster_HTTs/ pipeline
 collapsed_clades: "/path/to/collapsed_nodes_with_species.txt"
 can_htt: "/path/to/sign_TE_pairs_dnds_noIS.txt" #output file of 4_TE_Ks_comparison/ pipeline
