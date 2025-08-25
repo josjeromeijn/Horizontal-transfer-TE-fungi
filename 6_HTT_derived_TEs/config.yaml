@@ -1,9 +1,8 @@
-genome_folder: "/home/josje/NOBINFBACKUP/TE_extraction/"
-gff_folder: "/home/josje/NOBINFBACKUP/TE_extraction/"
-#out_dir: "/home/josje/NOBINFBACKUP/cluster_mmseqs_all_tes_jgi/"
-out_dir: "/home/josje/NOBINFBACKUP/cluster_mmseqs_all_tes_jgi_incl_strandedness/"
-classification_dir: "/home/josje/scripts/TE_classification/pastec_earlgray_annotations/"
-curlib_dir: "/home/josje/scripts/TE_classification/curlib_annotations_earlgray/"
-community_folder: "/home/josje/NOBINFBACKUP/Cluster_HTTs/Snakemake_final/communities2/"
-collapsed_clades: "/home/josje/scripts/BUSCO_Ks_tree_nodes/collapsed_nodes_with_species.txt"
-can_htt: "/home/josje/NOBINFBACKUP/TE_Ks_comparison/sign_TE_pairs_dnds_noIS.txt"
+genome_folder: "/your/path/"
+gff_folder: "/your/path/"
+out_dir: "/your/path/"
+classification_dir: "/your/path/"
+curlib_dir: "/your/path/"
+community_folder: "/your/path/" #output folder of 5_Cluster_HTTs/ pipeline
+collapsed_clades: "/path/to/collapsed_nodes_with_species.txt"
+can_htt: "/path/to/sign_TE_pairs_dnds_noIS.txt" #output file of 4_TE_Ks_comparison/ pipeline
