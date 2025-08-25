@@ -1,0 +1,348 @@
+###30-01-24 by Josje Romeijn
+#Snakefile to extract all TEs from genomes using the coordinates in BED file
+#and cluster TEs to find HTT derived TEs (including fragments/non-autonomous TEs)
+
+#Load config file and packages
+configfile: "config.yaml"
+import os, subprocess
+import pandas as pd
+from snakemake.utils import makedirs
+
+
+OUT_DIR=config["out_dir"]
+CLASSIFICATION_DIR=config["classification_dir"]
+CURLIB_DIR=config["curlib_dir"]
+COMMUNITY_FOLDER=config["community_folder"]
+COLLAPSED_CLADES=config["collapsed_clades"]
+CAN_HTT=config["can_htt"]
+
+#---------------------------DEFINE FUNCTIONS------------------------------------
+
+#function to extract genome comparisons from file names
+def extract_genome_comparisons(files):
+    genome_comp = {}
+    for file in files:
+        file = file.replace(".csv", "").replace("comm_", "")
+        sp1, sp2 = file.split("--")
+        genome_comp[file] = [sp1, sp2]
+    return genome_comp
+
+def get_hitcommunities(file, match1, match2):
+    #store hitcommunities
+    hc1 = []
+    hc2 = []
+
+    #loop over file to find both TEs and their respective hit communities
+    with open(file, "r") as file:
+        for line in file:
+            if match1 in line:
+                hc1.append(line.strip().split("\t")[2])
+            if match2 in line:
+                hc2.append(line.strip().split("\t")[2])
+
+    #get the hit community that is in common
+    return list(set(hc1) & set(hc2))
+
+#function to look up TEs that belong to same mmseqs cluster
+def get_associated_tes(file, te):
+    command = f"awk '{{if ($2 == \"{te}(+)\" || $2 == \"{te}(-)\") print $1}}' {file}"
+    group = subprocess.check_output(command, shell=True).decode('utf-8').strip()
+    command = f"awk '{{if ($1 == \"{group}\") print $2}}' {file}"
+    result = subprocess.check_output(command, shell=True).decode('utf-8').strip().split("\n")
+    return result
+
+
+#----------------------------GET LIST OF GENOMES--------------------------------
+
+print("get list of genomes")
+#define a list containing all genome names
+genome_folder = config["genome_folder"]
+GENOMES = []
+for file in os.listdir(genome_folder):
+    if file.endswith(".fasta"):
+        genome_name = file.split(".")[0]
+        if all(str not in genome_name for str in ["_extracted_TE", "P9", "P7","P2", "Calmar_TE_example_10Kb_extra", "Lipst_TE_example_10Kb_extra"]):
+            GENOMES.append(genome_name)
+        if genome_name == "MoelNVP71_1": #one outlier with P7 in its name...
+            GENOMES.append(genome_name)
+
+
+print("get minimal pID per hit community")
+#per genome, find if it has any HTTs
+#if it does, get all the minimal between-species pID per hit community
+community_files = os.listdir(COMMUNITY_FOLDER)
+community_files = [file for file in community_files if not file.endswith(("_TEs.csv", "_connectivity.csv","communities.csv")) and file.endswith(".csv")]
+comparison = extract_genome_comparisons(community_files)
+
+#load in collapsed clades
+clade_dict = {}
+with open(COLLAPSED_CLADES, 'r') as file:
+    for index, line in enumerate(file, start =1):
+        clade_dict[f"clade{index}"] = line.strip().split()
+
+
+#per genome, get the different pIDs as thresholds for mmseq runs
+with open(OUT_DIR + "pID_per_community.txt", "w") as outfile:
+    pids_mmseq = {}
+    for genome in GENOMES:
+        #first find out if genome is in collapsed clade
+        clade = [key for key, values in clade_dict.items() if any(value == genome for value in values)]
+        if clade == []: #so not in collapsed clade
+            genome_comparisons = [key for key, values in comparison.items() if any(value == genome for value in values)]
+        else: #genome is in a collapsed clade
+            genome_comparisons = [key for key, values in comparison.items() if any(value == clade[0] for value in values)]
+        #find different pids in hit communities involving this genome
+        pids = []
+        if genome_comparisons != []:
+            for comp in genome_comparisons:
+                #use awk as it is more efficient than python for large files
+                file_path = COMMUNITY_FOLDER + "comm_" + comp + ".csv"
+                #find lowest pid per hit community
+                command = f"awk '$10 ~ /^[0-9]+$/ {{ if (!($10 in min) || $2 < min[$10]) min[$10] = $2 }} END {{ for (key in min) print key, min[key] }}' {file_path}"
+                result = subprocess.check_output(command, shell=True).decode('utf-8')
+                #add to each hit community the pid and the genome comparison to the same line, and print to output file
+                outfile.write("\n".join([comp + " " + i for i in result.rsplit("\n",1)[0].split("\n")]) + "\n")
+                result = result.rsplit("\n", 1)[0].split("\n")
+                #only keep the second column as this is the pID
+                result = [round(float(pid.split(" ")[1]) / 100, 2) for pid in result]
+                #store pID
+                pids.extend(result)
+
+        #if this genome was involved in HTT, store the pIDs found in communities
+        if pids != []:
+            pids_mmseq[genome] = sorted(set(pids))
+
+print("get minimal pID per hit community: DONE")
+
+
+
+#Rule for creating output file
+rule all:
+    input:
+        [OUT_DIR + f"clustering/{genome}_output_pid{pid}_cluster.tsv" for genome in pids_mmseq.keys() for pid in pids_mmseq[genome]],
+        [OUT_DIR + f"clustering_classif/{genome}_pid{pid}_cluster_classif.tsv" for genome in pids_mmseq.keys() for pid in pids_mmseq[genome]],
+        [OUT_DIR + f"clustering_classif_length/{genome}_pid{pid}_cluster_classif_length.tsv" for genome in pids_mmseq.keys() for pid in pids_mmseq[genome]],
+        expand(OUT_DIR + "htt_associated/htt_associated_tes_{Genome}_reduced_no_overlap_nested.txt", Genome=GENOMES),
+        expand(OUT_DIR + "htt_associated/htt_associated_tes_{Genome}_reduced_incl_length.txt", Genome=GENOMES)
+
+
+
+
+
+#1)EXTRACT TRANSPOSONS
+
+#per genome, make a temporary file containing unique ID's per transposon sequence
+rule make_region_files:
+    input:
+        gff=config["gff_folder"] + "{genome}.filteredRepeats.gff"
+    output:
+        OUT_DIR + "extracted_TE_fasta/names_{genome}.txt"
+    shell:
+        """
+        awk -F'\t' '!/^#/ {{split($9, a, ";"); for (i in a) {{if (match(a[i], "ID=")) {{gsub("ID=", "", a[i]); print a[i]}}}}}}' {input.gff} | awk '{{count[$1]++; print $1"_"count[$1]-1}}' > {output}
+        """
+
+#per genome, first merge this temporary transposon ID's file with the GFF file containing the locations of the transposons. Then, extract the transposons using this GFF file
+#(all transposon fasta seqs will have unique ID). Furthermore, since transeq interprets DNA coordinates 0 based and half-open (bed-format), we extract 1 from all start coordinates.
+rule extract_sequences:
+    input:
+        fasta=config["genome_folder"] + "{genome}.fasta",
+        gff=config["gff_folder"] + "{genome}.filteredRepeats.gff",
+        region_file=OUT_DIR + "extracted_TE_fasta/names_{genome}.txt"
+    output:
+        OUT_DIR + "extracted_TE_fasta/{genome}_extracted_TE.fasta"
+    shell:
+        """
+        paste <(awk '{{print $1 "\t" $4 "\t" $5 "\t" $6 "\t" $7}}' {input.gff}) <(awk '{{print $1}}' {input.region_file}) \
+        | awk '$6 !~ /^\(.*\)N_[0-9]+$/{{ $2 = $2 - 1; print $1 "\t" $2 "\t" $3 "\t" $6 "\t" $4 "\t" $5}}' \
+        | bedtools getfasta -s -name+ -fi {input.fasta} -bed - > {output}
+        """
+
+        # paste <(awk '{{print $1 "\t" $4 "\t" $5}}' {input.gff}) <(awk '{{print $1}}' {input.region_file}) \
+        # | awk '$4 !~ /^\(.*\)N_[0-9]+$/{{ $2 = $2 - 1; print }}' \
+        # | awk '$3 - $2 >= 300' \
+        # | tr ' ' '\t' \
+        # | bedtools getfasta -name+ -fi {input.fasta} -bed - > {output}
+
+#2)RUN MMSEQS2
+
+rule mmseqs:
+    input:
+        rules.extract_sequences.output
+    output:
+        fasta1=OUT_DIR + "clustering/{genome}_output_pid{pid}_all_seqs.fasta",
+        cluster = OUT_DIR + "clustering/{genome}_output_pid{pid}_cluster.tsv",
+        fasta2=OUT_DIR + "clustering/{genome}_output_pid{pid}_rep_seq.fasta"
+    params:
+        tmp = OUT_DIR + "tmp_{genome}",
+        out = OUT_DIR + "clustering/{genome}_output_pid{pid}",
+        pid = "{pid}"
+    shell:
+        """
+        mmseqs easy-cluster -c 0.2 --cov-mode 1 --min-seq-id {params.pid} {input} {params.out} {params.tmp}
+        """
+
+
+#3)COMBINE WITH CLASSIFICATIONS
+rule classif:
+    input:
+        classif=CLASSIFICATION_DIR + "pastec_earlgray_annotation_{genome}.txt",
+        curlib=CURLIB_DIR + "2759.RepeatMasker.lib.annotations",
+        cluster=rules.mmseqs.output.cluster
+    output:
+        OUT_DIR + "clustering_classif/{genome}_pid{pid}_cluster_classif.tsv"
+    shell:
+        """
+        #fist load denovo classifications into memory
+        awk -F"\t" 'FILENAME == ARGV[1] {{b[$1]=$7 "\t" $8 "\t" $9; next}}
+            #load curlib classifications into memory
+            FILENAME == ARGV[2] {{ c[tolower($1)] = $7 "\t" $8 "\t" $9; next}}
+            FILENAME == ARGV[3] {{
+                key1 = tolower($1); key2 = tolower($2)
+                #get TE families from individual TEs
+                sub(/::.*$/, "", key1)
+                sub(/_[^_]*$/, "", key1)
+                sub(/::.*$/, "", key2)
+                sub(/_[^_]*$/, "", key2)
+                #default: no match
+                match1 = "NA\tNA\tNA"
+                match2 = "NA\tNA\tNA"
+                #find matches
+                for (k in b) {{
+                    if (match(k, "^" key1 "[a-zA-Z]")) match1 = b[k]
+                    if (match(k, "^" key2 "[a-zA-Z]")) match2 = b[k] }}
+
+                for (k in c) {{
+                    if (k == ">" key1) match1 = c[k]
+                    if (k == ">" key2) match2 = c[k] }}
+                print $0 "\t" key1 "\t" key2 "\t" match1 "\t" match2
+            }}' {input.classif} {input.curlib} {input.cluster} > {output}
+        """
+
+#add TE length
+rule length:
+    input:
+        rules.classif.output
+    output:
+        OUT_DIR + "clustering_classif_length/{genome}_pid{pid}_cluster_classif_length.tsv"
+    shell:
+        """
+        awk -F"\t" '{{len = $2; sub(/.*:/, "", len); split(len, a, "-"); print $0 "\t" (a[2] - a[1])}}' {input} > {output}
+        """
+
+
+#per horizontally transferred TE, check which hit community has lowest pID
+#and get TEs involved in mmseqs cluster with that pID
+rule get_htt_associated_tes:
+    input:
+        clustering = [OUT_DIR + f"clustering_classif_length/{genome}_pid{pid}_cluster_classif_length.tsv" for genome in pids_mmseq.keys() for pid in pids_mmseq[genome]],
+        can_htt = CAN_HTT,
+        comm_files = COMMUNITY_FOLDER
+    output:
+        #OUT_DIR + "htt_associated/htt_associated_tes_Acema1_full.txt"
+        [OUT_DIR + f"htt_associated/htt_associated_tes_{Genome}_full.txt" for Genome in GENOMES]
+    run:
+        #1) load in all hit communities and their lowest pID
+        lowest_pid_df = pd.read_table(OUT_DIR + "pID_per_community.txt", delimiter=" ", header=None, names=["comp","hitcommunity","lowest_pid"])
+        print("loading in lowest pID's done")
+
+        #2) loop over candidate HTT TE pairs
+        with open(str(input.can_htt), 'r') as f:
+            next(f) #skip header
+            for line in f:
+                #3) get the two TEs and their genome comparison
+                _, _, query, subject, comp, _, _, _ = line.split("\t")
+                sp1 = query.split("__")[0]
+                sp2 = subject.split("__")[0]
+
+                #if either species is in collapsed clade, get this collapsed clade
+                sp1 = next((clade for clade, sp in clade_dict.items() if sp1 in sp), sp1)
+                sp2 = next((clade for clade, sp in clade_dict.items() if sp2 in sp), sp2)
+
+
+                #4) find hit community of TE
+                if os.path.isfile(str(input.comm_files) + f"/comm_{sp1}--{sp2}_TEs.csv"):
+                    hc = get_hitcommunities(str(input.comm_files) + f"/comm_{sp1}--{sp2}_TEs.csv", query, subject)
+                else:
+                    hc = get_hitcommunities(str(input.comm_files) + f"/comm_{sp2}--{sp1}_TEs.csv", query, subject)
+
+
+                #5) find lowest pID of that genome comparison
+                if hc:
+                    if f"{sp1}--{sp2}" in lowest_pid_df['comp'].values:
+                        lowest_pid = lowest_pid_df.loc[lowest_pid_df['comp'] == f"{sp1}--{sp2}", 'lowest_pid'].min()
+                    else:
+                        lowest_pid = lowest_pid_df.loc[lowest_pid_df['comp'] == f"{sp2}--{sp1}", 'lowest_pid'].min()
+
+
+                #in case no hit communities were found with these TEs, print error message
+                else:
+                    print(f"Something went wrong with {query}, {subject} in {comp}")
+
+
+
+                #6) find TEs that belong to same cluster (=are believed to be descendants of these TEs) in both genomes
+                tes_associated_htt_sp1 = get_associated_tes(f"{OUT_DIR}clustering_classif_length/{query.split("__")[0]}_pid{round(lowest_pid / 100, 2)}_cluster_classif_length.tsv", query.split("__")[1])
+                tes_associated_htt_sp2 = get_associated_tes(f"{OUT_DIR}clustering_classif_length/{subject.split("__")[0]}_pid{round(lowest_pid / 100, 2)}_cluster_classif_length.tsv", subject.split("__")[1])
+
+
+                #7) write TEs to output file of respective genome
+                if not os.path.exists(OUT_DIR + "htt_associated/"):
+                    os.makedirs(OUT_DIR + "htt_associated/")
+
+                with open(OUT_DIR + f"htt_associated/htt_associated_tes_{query.split("__")[0]}_full.txt", "a") as outfile:
+                    outfile.write("\n".join(tes_associated_htt_sp1) + "\n")
+                with open(OUT_DIR + f"htt_associated/htt_associated_tes_{subject.split("__")[0]}_full.txt", "a") as outfile:
+                    outfile.write("\n".join(tes_associated_htt_sp2) + "\n")
+
+        print("Done finding HTT-associated TEs")
+        print("Creating empty files")
+        #8) create empty files for genomes that are not involved in HTT
+        for file in output:
+            if not os.path.isfile(file):
+                open(file, "a").close()
+        print("Done creating empty files")
+
+#many TEs are present multiple times in file, reduce to make sure each TE occurs max once.
+rule reduce_htt_associated_tes:
+    input:
+        OUT_DIR + "htt_associated/htt_associated_tes_{Genome}_full.txt"
+    output:
+        OUT_DIR + "htt_associated/htt_associated_tes_{Genome}_reduced.txt"
+    shell:
+        """
+        cat {input} | sort | uniq > {output}
+        """
+
+#merge nested or overlapping TEs
+rule merge_nes_overlap:
+    input:
+        rules.reduce_htt_associated_tes.output
+    output:
+        out = OUT_DIR + "htt_associated/htt_associated_tes_{Genome}_reduced_no_overlap_nested.txt",
+        bed_tmp = OUT_DIR + "htt_associated/htt_associated_tes_{Genome}_reduced.bed.tmp",
+        bed = OUT_DIR + "htt_associated/htt_associated_tes_{Genome}_reduced.bed"
+    shell:
+        """
+        if [ ! -s {input} ]; then
+            awk '{{split($1, a,"::"); split(a[2], b, ":"); split(b[2], c, "-"); print b[1] "\\t" c[1] "\\t" c[2]}}' {input} > {output.bed_tmp}
+            bedtools sort -i {output.bed_tmp} > {output.bed}
+            bedtools merge -i {output.bed} > {output.out}
+        else
+            touch {output.out}
+            touch {output.bed_tmp}
+            touch {output.bed}
+        fi
+        """
+
+
+#get length
+rule get_length:
+    input:
+        rules.merge_nes_overlap.output.out
+    output:
+        OUT_DIR + "htt_associated/htt_associated_tes_{Genome}_reduced_incl_length.txt"
+    shell:
+        """
+        awk 'BEGIN{{SUM=0}} {{SUM+=$3-$2}} END {{print SUM}}' {input} > {output}
+        """
