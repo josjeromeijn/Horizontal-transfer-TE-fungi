@@ -1,3 +1,5 @@
+#if it's a folder or dir: make sure to end with "/"
+
 genome_folder: "/your/path/"
 gff_folder: "/your/path/"
 out_dir: "/your/path/"
